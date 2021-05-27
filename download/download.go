@@ -100,6 +100,7 @@ func getSize(c chan<- size, url string) {
 func download(c chan<- error, b *progressbar.ProgressBar, f file, a int) {
 	r, err := http.Get(f.url)
 	if err != nil {
+		log.Output(2, fmt.Sprintf("HTTP request to %s failed", f.url))
 		c <- err
 		return
 	}
@@ -109,14 +110,16 @@ func download(c chan<- error, b *progressbar.ProgressBar, f file, a int) {
 		if a < retries {
 			time.Sleep(time.Duration(int(math.Pow(float64(2), float64(a)))) * time.Second)
 			download(c, b, f, a+1)
+			return
 		} else {
-			log.Output(2, fmt.Sprintf("After %d attempts, could not download %s (%s)", retries, f.url, r.Status))
+			c <- fmt.Errorf("After %d attempts, could not download %s (%s)", retries, f.url, r.Status)
 			return
 		}
 	}
 
 	h, err := os.Create(f.path)
 	if err != nil {
+		log.Output(2, fmt.Sprintf("Failed to create %s", f.path))
 		c <- err
 		return
 	}
@@ -128,7 +131,9 @@ func download(c chan<- error, b *progressbar.ProgressBar, f file, a int) {
 		_, err = io.Copy(h, r.Body)
 	}
 	if err != nil {
+		log.Output(2, fmt.Sprintf("Error downloading %s", f.url))
 		c <- err
+		return
 	}
 	c <- nil
 }
